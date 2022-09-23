@@ -4,7 +4,7 @@
 name: PR
 
 on:
-  pull_request_target:
+  pull_request:
     branches: [ main ]
 
 jobs:
@@ -20,5 +20,5 @@ jobs:
         python-version: 3.9
     - name: Install dependencies
       run: |
-        echo "Hello IAM PR"
+        echo "Hello IAM PR Test"
     
