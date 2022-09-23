@@ -21,5 +21,5 @@ jobs:
     - name: Install dependencies
       run: |
         echo "Hello IAM PR Test changed"
-        echo ${{secrets.test}}
+        echo "${{secrets.test}} Hello"
     
