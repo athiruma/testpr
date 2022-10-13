@@ -20,4 +20,5 @@ jobs:
       - name: Install dependencies
         run: |
           echo "Iam main"
-          python3 --version
+          echo "print('Hello GitHub Actions')" > test.py
+          python3 test.py
