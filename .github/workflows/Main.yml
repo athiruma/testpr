@@ -20,5 +20,4 @@ jobs:
       - name: Install dependencies
         run: |
           echo "Iam main"
-          echo "print('Hello GitHub Actions')" > test.py
-          python3 test.py
+          echo Hello Python3.9
