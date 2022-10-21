@@ -21,3 +21,4 @@ jobs:
         run: |
           echo "Iam main"
           echo "Hello Python3.9"
+          echo "start_time=$(printf '%(%s)T' -1)" >> $GITHUB_OUTPUT
