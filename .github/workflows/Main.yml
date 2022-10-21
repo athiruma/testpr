@@ -32,6 +32,6 @@ jobs:
          path: file.txt
      - name: Run
        run: |
-        cat file.txt
+         cat file.txt
 				
 				
