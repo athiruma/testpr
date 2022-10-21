@@ -9,6 +9,7 @@ jobs:
   job1:
   
     runs-on: ubuntu-latest
+    name: job1
     steps:
      - uses: actions/checkout@v3
      - name: test file
