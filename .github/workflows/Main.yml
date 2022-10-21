@@ -12,6 +12,10 @@ jobs:
     name: job1
     steps:
      - uses: actions/checkout@v3
+     - uses: actions/cache@v3
+       with:
+         path: ./file.txt
+         key: file
      - name: Test hello
        run: |
          echo Hello > file.txt
