@@ -23,8 +23,8 @@ jobs:
         run: |
           echo "Iam main"
           echo "Hello Python3.9"
-          echo "::set-output name=start_time::$(printf '%(%s)T' -1)"
-          # echo "start_time=12" >> $GITHUB_OUTPUT
+          echo "start_time=12" >> $GITHUB_OUTPUT
+          echo ${{ steps.test.outputs.start_time }}
   test1:
     name: test1
     runs-on: ubuntu-latest
