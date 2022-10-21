@@ -22,3 +22,11 @@ jobs:
           echo "Iam main"
           echo "Hello Python3.9"
           echo "start_time=$(printf '%(%s)T' -1)" >> $GITHUB_OUTPUT
+  test1:
+    name: test2
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+     - uses: actions/checkout@v3
+     - name: Install
+       run: ${{ needs.test.start_time }}
