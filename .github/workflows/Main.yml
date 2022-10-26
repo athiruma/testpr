@@ -14,7 +14,7 @@ jobs:
      - uses: actions/checkout@v3
      - uses: actions/cache@v3
        with:
-         path: ~/file.txt
+         path: file.txt
          key: file
      - name: Test hello
        run: |
