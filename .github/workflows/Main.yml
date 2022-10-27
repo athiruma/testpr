@@ -65,7 +65,7 @@ jobs:
         env:
           INSTANCE_ID: ${{ needs.terrafom_apply.outputs.INSTANCE_ID }}
         run: |
-          echo $INSTANCE_ID
+          echo ${{ needs.terrafom_apply.outputs.INSTANCE_ID }}
 
   terraform_destroy:
     name: Terraform Destroy
