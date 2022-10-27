@@ -1,64 +1,108 @@
-# This is a basic workflow to help you get started with Actions
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: CI
+name: PR
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  pull_request_target:
+    branches: [ main ]
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  terraform_apply:
+    name: Terraform apply
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    outputs:
+      INSTANCE_ID: ${steps.outputs.terraform_instance_id.INSTANCE_ID}
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: |
-          mkdir test
-          echo Hello, world! > test/test.txt
-          echo print test/test.txt 
-          cat test/test.txt
-        
-      # In the first job
-      - uses: actions/cache@v3
-        with:
-          path: test/
-          key: cache-key
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    - name: Configure AWS credentials for pytest
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.REGION }}
+    - name: Install terraform and terragrunt
+      run: |
+        # Install Terrafrom
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+        sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+        sudo apt-get -y update && sudo apt-get install -y terraform
+        pip3 install jinja2
+        # install terragrunt
+        wget https://github.com/gruntwork-io/terragrunt/releases/download/v0.38.6/terragrunt_linux_amd64
+        mv terragrunt_linux_amd64 terragrunt
+        mv terragrunt /usr/local/bin/terragrunt
+        chmod 775 /usr/local/bin/terragrunt
+    - name: Create instance
+      id: terraform_instance_id
+      env:
+        IMAGE_ID: ${{ secrets.IMAGE_ID }}
+        INSTANCE_TYPE: ${{ secrets.INSTANCE_TYPE }}
+        ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
+        ROLE_NAME: ${{ secrets.ROLE_NAME }}
+        REGION_NAME: ${{ secrets.TERRAFORM_REGION }}
+        TAG_NAME: ${{ secrets.TAG_NAME }}
+      run: |
+        cd terraform/aws_instance
+        # terrafrom apply
+        terragrunt apply -auto-approve 1> /dev/null
+        echo "INSTANCE_ID=$(terragrunt output -raw instance_id)" >> "GITHUB_OUTPUT"
+    - uses: actions/cache@v3
+      with:
+        path: terraform/aws_instance
+        key: terraform-state
 
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
-  
-  use_artifact:
-    # The type of runner that the job will run on
+  test:
+    name: test
+    needs: terraform_apply
     runs-on: ubuntu-latest
-    needs: build
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # In the second job
-      - uses: actions/cache@v3
-        with:
-          path: test/
-          key: cache-key  # Must be the same key you specified in the first job
-             
-      - name: Run a one-line script
+      - name: Check
+        uses: actions/checkout@v3
+      - name: test
+        env:
+          INSTANCE_ID: ${{ needs.terrafom_apply.outputs.INSTANCE_ID }}
         run: |
-             echo print test/test.txt 
-             cat test/test.txt
-  
+          echo $INSTANCE_ID
+
+  terraform_destroy:
+    name: Terraform Destroy
+    needs: [terraform_apply, test]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    - name: Configure AWS credentials for pytest
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.REGION }}
+    - uses: actions/cache@v3
+      with:
+        path: terraform/aws_instance
+        key: terraform-state
+    - name: Install terraform and terragrunt
+      run: |
+        # Install Terrafrom
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+        sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+        sudo apt-get -y update && sudo apt-get install -y terraform
+        pip3 install jinja2
+        # install terragrunt
+        wget https://github.com/gruntwork-io/terragrunt/releases/download/v0.38.6/terragrunt_linux_amd64
+        mv terragrunt_linux_amd64 terragrunt
+        mv terragrunt /usr/local/bin/terragrunt
+        chmod 775 /usr/local/bin/terragrunt
+    - name: Destroy instance
+      env:
+        ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
+        ROLE_NAME: ${{ secrets.ROLE_NAME }}
+        REGION_NAME: ${{ secrets.TERRAFORM_REGION }}
+      run: |    
+        cd terraform/aws_instance
+        # terraform destroy/
+        terragrunt destroy -auto-approve 1> /dev/null
