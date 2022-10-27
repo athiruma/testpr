@@ -109,7 +109,7 @@ jobs:
         terragrunt destroy -auto-approve 1> /dev/null
   clear-ccache:
     runs-on: ubuntu-latest
-    needs: [terraform_deestroy]
+    needs: [terraform_destroy]
     steps:
       - name: Clear cache
         uses: actions/github-script@v6
