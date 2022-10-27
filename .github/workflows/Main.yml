@@ -71,6 +71,7 @@ jobs:
     name: Terraform Destroy
     needs: [terraform_apply, test]
     runs-on: ubuntu-latest
+    if: success() || failure()
     steps:
     - uses: actions/checkout@v3
       with:
