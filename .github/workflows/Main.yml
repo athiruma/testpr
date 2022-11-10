@@ -6,107 +6,131 @@ name: MAIN
 on:
   push:
     branches: [ main ]
-
 jobs:
-  terraform_apply:
-    name: Terraform apply
-    runs-on: ubuntu-latest
-    outputs:
-      output1: ${{ steps.terraform_instance_id.outputs.INSTANCE_ID }}
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-    - name: Configure AWS credentials for pytest
-      uses: aws-actions/configure-aws-credentials@v1-node16
-      with:
-        aws-access-key-id: ${{ secrets.ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.REGION }}
-    - name: Install terraform and terragrunt
-      run: |
-        # Install Terrafrom
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-        sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-        sudo apt-get -y update && sudo apt-get install -y terraform
-        pip3 install jinja2
-        # install terragrunt
-        wget https://github.com/gruntwork-io/terragrunt/releases/download/v0.38.6/terragrunt_linux_amd64
-        mv terragrunt_linux_amd64 terragrunt
-        mv terragrunt /usr/local/bin/terragrunt
-        chmod 775 /usr/local/bin/terragrunt
-    - name: Create instance
-      id: terraform_instance_id
-      env:
-        IMAGE_ID: ${{ secrets.IMAGE_ID }}
-        INSTANCE_TYPE: ${{ secrets.INSTANCE_TYPE }}
-        ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
-        ROLE_NAME: ${{ secrets.ROLE_NAME }}
-        REGION_NAME: ${{ secrets.TERRAFORM_REGION }}
-        TAG_NAME: ${{ secrets.TAG_NAME }}
-      run: |
-        cd terraform/aws_instance
-        # terrafrom apply
-        terragrunt apply -auto-approve 1> /dev/null
-        echo "INSTANCE_ID=$(terragrunt output -raw instance_id)" >> "$GITHUB_OUTPUT"
-    - uses: actions/cache@v3
-      with:
-        path: terraform/aws_instance/*
-        key: terraform-state-${{ steps.terraform_instance_id.outputs.INSTANCE_ID }}
-
-  test:
-    name: test
-    needs: terraform_apply
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check
-        uses: actions/checkout@v3
-      - name: test
+  build:
+    runs-on: [self-hosted, linux]
+    services:
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.9.2
         env:
-          INSTANCE_ID: ${{ needs.terraform_apply.outputs.output1 }}
-        run: |
-          echo "$INSTANCE_ID"
-
-  terraform_destroy:
-    name: Terraform Destroy
-    needs: [terraform_apply, test]
-    runs-on: ubuntu-latest
-    if: success() || failure()
+          discovery.type: single-node
+        options: >-
+          --health-cmd "curl http://localhost:9200/_cluster/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+        # <port on host>:<port on container>
+        - 9200:9200
+      redis:
+        image: redis
+        options: --entrypoint redis-server
     steps:
-    - uses: actions/checkout@v3
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-    - name: Configure AWS credentials for pytest
-      uses: aws-actions/configure-aws-credentials@v1-node16
-      with:
-        aws-access-key-id: ${{ secrets.ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.REGION }}
-    - uses: actions/cache@v3
-      with:
-        path: terraform/aws_instance/*
-        key: terraform-state-${{ needs.terraform_apply.outputs.output1 }}
-    - name: Install terraform and terragrunt
-      run: |
-        # Install Terrafrom
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-        sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-        sudo apt-get -y update && sudo apt-get install -y terraform
-        pip3 install jinja2
-        # install terragrunt
-        wget https://github.com/gruntwork-io/terragrunt/releases/download/v0.38.6/terragrunt_linux_amd64
-        mv terragrunt_linux_amd64 terragrunt
-        mv terragrunt /usr/local/bin/terragrunt
-        chmod 775 /usr/local/bin/terragrunt
-    - name: Destroy instance
-      env:
-        ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
-        ROLE_NAME: ${{ secrets.ROLE_NAME }}
-        REGION_NAME: ${{ secrets.TERRAFORM_REGION }}
-      run: |
-        cd terraform/aws_instance
-        # terraform destroy/
-        terragrunt destroy -auto-approve 1> /dev/null
+      - uses: actions/checkout@v2
+      - name: running tests
+        run: |
+          sleep 60
+          curl -X GET http://localhost:9200/
+# jobs:
+#   terraform_apply:
+#     name: Terraform apply
+#     runs-on: ubuntu-latest
+#     outputs:
+#       output1: ${{ steps.terraform_instance_id.outputs.INSTANCE_ID }}
+#     steps:
+#     - uses: actions/checkout@v3
+#       with:
+#         ref: ${{ github.event.pull_request.head.sha }}
+#     - name: Configure AWS credentials for pytest
+#       uses: aws-actions/configure-aws-credentials@v1-node16
+#       with:
+#         aws-access-key-id: ${{ secrets.ACCESS_KEY_ID }}
+#         aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
+#         aws-region: ${{ secrets.REGION }}
+#     - name: Install terraform and terragrunt
+#       run: |
+#         # Install Terrafrom
+#         curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+#         sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+#         sudo apt-get -y update && sudo apt-get install -y terraform
+#         pip3 install jinja2
+#         # install terragrunt
+#         wget https://github.com/gruntwork-io/terragrunt/releases/download/v0.38.6/terragrunt_linux_amd64
+#         mv terragrunt_linux_amd64 terragrunt
+#         mv terragrunt /usr/local/bin/terragrunt
+#         chmod 775 /usr/local/bin/terragrunt
+#     - name: Create instance
+#       id: terraform_instance_id
+#       env:
+#         IMAGE_ID: ${{ secrets.IMAGE_ID }}
+#         INSTANCE_TYPE: ${{ secrets.INSTANCE_TYPE }}
+#         ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
+#         ROLE_NAME: ${{ secrets.ROLE_NAME }}
+#         REGION_NAME: ${{ secrets.TERRAFORM_REGION }}
+#         TAG_NAME: ${{ secrets.TAG_NAME }}
+#       run: |
+#         cd terraform/aws_instance
+#         # terrafrom apply
+#         terragrunt apply -auto-approve 1> /dev/null
+#         echo "INSTANCE_ID=$(terragrunt output -raw instance_id)" >> "$GITHUB_OUTPUT"
+#     - uses: actions/cache@v3
+#       with:
+#         path: terraform/aws_instance/*
+#         key: terraform-state-${{ steps.terraform_instance_id.outputs.INSTANCE_ID }}
+
+#   test:
+#     name: test
+#     needs: terraform_apply
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Check
+#         uses: actions/checkout@v3
+#       - name: test
+#         env:
+#           INSTANCE_ID: ${{ needs.terraform_apply.outputs.output1 }}
+#         run: |
+#           echo "$INSTANCE_ID"
+
+#   terraform_destroy:
+#     name: Terraform Destroy
+#     needs: [terraform_apply, test]
+#     runs-on: ubuntu-latest
+#     if: success() || failure()
+#     steps:
+#     - uses: actions/checkout@v3
+#       with:
+#         ref: ${{ github.event.pull_request.head.sha }}
+#     - name: Configure AWS credentials for pytest
+#       uses: aws-actions/configure-aws-credentials@v1-node16
+#       with:
+#         aws-access-key-id: ${{ secrets.ACCESS_KEY_ID }}
+#         aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
+#         aws-region: ${{ secrets.REGION }}
+#     - uses: actions/cache@v3
+#       with:
+#         path: terraform/aws_instance/*
+#         key: terraform-state-${{ needs.terraform_apply.outputs.output1 }}
+#     - name: Install terraform and terragrunt
+#       run: |
+#         # Install Terrafrom
+#         curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+#         sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+#         sudo apt-get -y update && sudo apt-get install -y terraform
+#         pip3 install jinja2
+#         # install terragrunt
+#         wget https://github.com/gruntwork-io/terragrunt/releases/download/v0.38.6/terragrunt_linux_amd64
+#         mv terragrunt_linux_amd64 terragrunt
+#         mv terragrunt /usr/local/bin/terragrunt
+#         chmod 775 /usr/local/bin/terragrunt
+#     - name: Destroy instance
+#       env:
+#         ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
+#         ROLE_NAME: ${{ secrets.ROLE_NAME }}
+#         REGION_NAME: ${{ secrets.TERRAFORM_REGION }}
+#       run: |
+#         cd terraform/aws_instance
+#         # terraform destroy/
+#         terragrunt destroy -auto-approve 1> /dev/null
 
 #  clear-ccache:
 #    runs-on: ubuntu-latest
