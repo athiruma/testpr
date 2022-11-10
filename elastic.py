@@ -36,6 +36,38 @@ class ElasticSearchOperations:
             self.__iam_client = boto3.client('iam', region_name=region)
             self.__trail_client = boto3.client('cloudtrail', region_name=region)
 
+    def upload_to_elasticsearch(self, index: str, data: dict, doc_type: str = '_doc', es_add_items: dict = None):
+        """
+        This method is upload json data into elasticsearch
+        :param index: index name to be stored in elasticsearch
+        :param data: data must me in dictionary i.e. {'key': 'value'}
+        :param doc_type:
+        :param es_add_items:
+        :return:
+        """
+        # read json to dict
+        json_path = ""
+
+        # Add items
+        if es_add_items:
+            for key, value in es_add_items.items():
+                data[key] = value
+
+        # utcnow - solve timestamp issue
+        if not data.get('timestamp'):
+            data['timestamp'] = datetime.utcnow()  # datetime.now()
+
+        # Upload data to elastic search server
+        try:
+            if isinstance(data, dict):  # JSON Object
+                self.__es.index(index=index, doc_type=doc_type, body=data)
+            else:  # JSON Array
+                for record in data:
+                    self.__es.index(index=index, doc_type=doc_type, body=record)
+            return True
+        except Exception as err:
+            raise err
+
     def get_query_data_between_range(self, start_datetime: datetime, end_datetime: datetime):
         """
         This method returns the query to fetch the data in between ranges

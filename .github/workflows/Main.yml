@@ -7,11 +7,21 @@ on:
   push:
     branches: [ main ]
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: echo "hello"
+
+  build:
+    needs: [test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ '3.8', '3.9', '3.10' ]
     services:
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:7.9.2
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.11.0
         env:
           discovery.type: single-node
         options: >-
@@ -23,10 +33,18 @@ jobs:
         # <port on host>:<port on container>
         - 9200:9200
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: running tests
+        env:
+          ELASTICSEARCH: 'localhost'
+          ELASTICSEARCH_PORT: '9200'
         run: |
+          sudo apt-get install build-essential python3-dev libldap2-dev libsasl2-dev vim -y
+          python -m pip install --upgrade pip
+          pip3 install boto3 elasticsearch==7.11.0 pytest
           curl -X GET http://localhost:9200/
+          python -m pytest -v tests/inte.py
+
 # jobs:
 #   terraform_apply:
 #     name: Terraform apply
