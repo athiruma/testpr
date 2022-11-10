@@ -22,14 +22,10 @@ jobs:
         ports:
         # <port on host>:<port on container>
         - 9200:9200
-      redis:
-        image: redis
-        options: --entrypoint redis-server
     steps:
       - uses: actions/checkout@v2
       - name: running tests
         run: |
-          sleep 60
           curl -X GET http://localhost:9200/
 # jobs:
 #   terraform_apply:
